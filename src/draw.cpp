@@ -486,6 +486,10 @@ static void DrawTopBar(float alpha, bool gridBar) {
     float x = right - 8;
     // title on the left
     float left = 14;
+    if (gridBar) {
+        Button(D2D1::RectF(8, 6, 44, h - 6), L"", icon::Back, Btn::Chrome, Hit::Tool, (int)Cmd::Grid, true, L"Back to the image (G or Esc)");
+        left = 54;
+    }
     std::wstring title, sub;
     if (gridBar) {
         title = PathName(folder);
@@ -505,7 +509,6 @@ static void DrawTopBar(float alpha, bool gridBar) {
     std::vector<ToolDef> tools;
     if (gridBar) {
         tools = {
-            {Cmd::Grid, icon::Back, L"Back to the image (G)", 0, false, true},
             {Cmd::Compare, 0, L"Compare the two picked images (C)", 2, false, gridMarks.size() == 2},
             {Cmd::Slideshow, icon::Slideshow, L"Slideshow (Space)", 3, false, !files.empty()},
             {Cmd::Settings, icon::Settings, L"Settings (Ctrl+,)", 1, false, true},
@@ -771,7 +774,7 @@ static void DrawToast(float bottom) {
     auto* f = Format(13);
     float tw = MeasureWidth(toastText, f);
     float aw = toastAction.empty() ? 0 : MeasureWidth(toastAction, Format(13, DWRITE_FONT_WEIGHT_SEMI_BOLD)) + 28;
-    float w = std::min(W - 40, tw + 36 + aw);
+    float w = std::min(W - 40, tw + 44 + aw);
     float y = bottom - 16 - 40 + (1 - toastAlpha) * 10;
     D2D1_RECT_F r = D2D1::RectF((W - w) / 2, y, (W + w) / 2, y + 40);
     rt->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(), nullptr, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(), toastAlpha), Layer());

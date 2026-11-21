@@ -616,6 +616,11 @@ void DrawSettings() {
     float left = pad, right = std::min(W - pad, pad + 860.0f);
     if (W > 860 + 2 * pad) { left = (W - 860) / 2; right = left + 860; }
     float viewTop = kTopBar;
+    if (settingsContentH > 0) {
+        float maxS = std::max(0.0f, settingsContentH - (H - viewTop));
+        settingsScroll = std::clamp(settingsScroll, 0.0f, maxS);
+        settingsScrollTarget = std::clamp(settingsScrollTarget, 0.0f, maxS);
+    }
     rt->PushAxisAlignedClip(D2D1::RectF(0, viewTop, W, H), D2D1_ANTIALIAS_MODE_ALIASED);
     float y = viewTop + 18 - settingsScroll;
     c.Text(L"Settings", Format(24, DWRITE_FONT_WEIGHT_SEMI_BOLD), D2D1::RectF(left, y, right, y + 36), t.text);
@@ -846,7 +851,7 @@ void DrawSettings() {
     D2D1_RECT_F bar = D2D1::RectF(0, 0, W, kTopBar);
     AddHot(bar, Hit::Caption, 0);
     Button(D2D1::RectF(8, 6, 44, kTopBar - 6), L"", icon::Back, Btn::Chrome, Hit::SetBack, 0, true, L"Back (Esc)");
-    c.Text(L"Settings", Format(13, DWRITE_FONT_WEIGHT_SEMI_BOLD), D2D1::RectF(54, 0, 300, kTopBar), t.text);
+    if (settingsScroll > 40) c.Text(L"Settings", Format(13, DWRITE_FONT_WEIGHT_SEMI_BOLD), D2D1::RectF(54, 0, 300, kTopBar), t.text);
     if (!fullscreen) DrawCaptionButtons(W, 0, kTopBar);
 }
 

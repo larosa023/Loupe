@@ -264,9 +264,32 @@ void BuildSteps() {
         if (s_origW > s_origH && d.fullW > d.fullH) Fail(L"the saved copy isn't rotated");
         if (d.fullW > s_origH || d.fullH > s_origW) Fail(L"the saved copy is bigger than the rotated original");
     });
+    Add(L"save over the original", [] {
+        int j = FindFile([](const std::wstring& n) { return n == L"photo.bmp"; });
+        if (j >= 0) GoTo(j);
+    }, [] { return CurrentSettled() && Elapsed(400); }, 10000, [] {
+        Entry* e = Current();
+        if (!e || !e->ready()) { Fail(L"no image to save over"); return; }
+        s_origW = e->fullW;
+        s_origH = e->fullH;
+        DoCmd(Cmd::RotateRight);
+        DoCmd(Cmd::Save);
+        if (!dialog.open) { Fail(L"Save didn't ask before replacing the original"); return; }
+        Shot(L"save-asks");
+        UiTestDialogPress(1);   // Replace
+    });
+    Add(L"saved over", [] {}, [] { Entry* e = Current(); return !editing && e && e->ready() && e->fullW == s_origH && e->fullH == s_origW; }, 30000, [] {
+        Line(L"  the original was replaced (now " + std::to_wstring(s_origH) + L"x" + std::to_wstring(s_origW) + L")");
+        DoCmd(Cmd::Undo);
+    });
+    Add(L"undo the save", [] {}, [] { Entry* e = Current(); return e && e->ready() && e->fullW == s_origW && e->fullH == s_origH; }, 30000, [] {
+        Line(L"  Ctrl+Z put the original back");
+    });
     Add(L"settings", [] { DoCmd(Cmd::Settings); }, [] { return Elapsed(700); }, 3000, [] {
         if (!settingsOpen) Fail(L"settings didn't open");
         Shot(L"settings");
+        if (GetWindowLongW(hwnd, GWL_STYLE) & WS_SYSMENU) Line(L"  frame: standard (no backdrop on this Windows)");
+        else Line(L"  frame: backdrop, DWM caption buttons suppressed");
         settingsScroll = settingsScrollTarget = 900;
         Shot(L"settings-more");
         settingsScroll = settingsScrollTarget = 5000;
@@ -275,7 +298,7 @@ void BuildSteps() {
     });
     Add(L"themes", [] {}, [] { return Elapsed(300); }, 3000, [] {
         std::wstring saved = g_cfg.theme;
-        for (const wchar_t* id : {L"light", L"midnight", L"sunset", L"paper"}) {
+        for (const wchar_t* id : {L"light", L"glass", L"midnight", L"sunset", L"paper"}) {
             g_cfg.theme = id;
             ApplyTheme();
             Shot(std::wstring(L"theme-") + id);

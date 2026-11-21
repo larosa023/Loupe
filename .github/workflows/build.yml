@@ -128,20 +128,6 @@ jobs:
           if (-not $first.WaitForExit(20000)) { $first.Kill(); throw 'Loupe did not close on --quit' }
           Write-Host 'Single window OK'
 
-      - name: File types (register, check, uninstall)
-        shell: pwsh
-        run: |
-          $exe = (Resolve-Path dist/Loupe.exe).Path
-          Start-Process $exe -ArgumentList '--register' -Wait
-          $cmd = (Get-ItemProperty 'HKCU:\Software\Classes\Loupe.Image\shell\open\command').'(default)'
-          Write-Host "open command: $cmd"
-          if ($cmd -notlike "*Loupe.exe*") { throw 'File types were not registered' }
-          $caps = Get-ItemProperty 'HKCU:\Software\larosa023\Loupe\Capabilities\FileAssociations'
-          if ($caps.'.jpg' -ne 'Loupe.Image' -or $caps.'.cr3' -ne 'Loupe.Image') { throw 'Capabilities missing' }
-          Start-Process $exe -ArgumentList '--uninstall' -Wait
-          if (Test-Path 'HKCU:\Software\Classes\Loupe.Image') { throw '--uninstall left the ProgID behind' }
-          Write-Host 'File types OK'
-
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -171,6 +157,20 @@ jobs:
           git add -A
           git commit -q -m "Screenshots for $env:GITHUB_SHA ($env:GITHUB_REF_NAME)"
           git push -q -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" ci-screenshots
+
+      - name: File types (register, check, uninstall)
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path dist/Loupe.exe).Path
+          Start-Process $exe -ArgumentList '--register' -Wait
+          $cmd = (Get-ItemProperty 'HKCU:\Software\Classes\Loupe.Image\shell\open\command').'(default)'
+          Write-Host "open command: $cmd"
+          if ($cmd -notlike "*Loupe.exe*") { throw 'File types were not registered' }
+          $caps = Get-ItemProperty 'HKCU:\Software\larosa023\Loupe\Capabilities\FileAssociations'
+          if ($caps.'.jpg' -ne 'Loupe.Image' -or $caps.'.cr3' -ne 'Loupe.Image') { throw 'Capabilities missing' }
+          Start-Process $exe -ArgumentList '--uninstall' -Wait
+          if (Test-Path 'HKCU:\Software\Classes\Loupe.Image') { throw '--uninstall left the ProgID behind' }
+          Write-Host 'File types OK'
 
   # A release is published when LOUPE_VERSION in src/common.h changes on main (or a v* tag is pushed).
   # Versions with a "-", such as 0.2.0-beta.1, are pre-releases: the Beta channel.

@@ -390,6 +390,34 @@ static void WatchHangar(bool on) {
     }).detach();
 }
 
+// With the frame extended for Mica/acrylic, DWM draws its own min/max/close wherever our pixels are
+// see-through. Dropping WS_SYSMENU stops that (keeping the min/max boxes keeps Snap Layouts working);
+// the system menu is then shown by hand on Alt+Space and a right-click on the title bar.
+static void UpdateFrameStyle() {
+    if (!hwnd || fullscreen) return;
+    LONG st = GetWindowLongW(hwnd, GWL_STYLE);
+    LONG want = t.backdrop ? (st & ~WS_SYSMENU) : (st | WS_SYSMENU);
+    if (want != st) {
+        SetWindowLongW(hwnd, GWL_STYLE, want);
+        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+}
+
+static void ShowSystemMenu(int sx, int sy) {
+    HMENU m = GetSystemMenu(hwnd, FALSE);
+    if (!m) return;
+    bool max = IsZoomed(hwnd);
+    EnableMenuItem(m, SC_RESTORE, max ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(m, SC_MOVE, max ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(m, SC_SIZE, max ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(m, SC_MAXIMIZE, max ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(m, SC_MINIMIZE, MF_ENABLED);
+    EnableMenuItem(m, SC_CLOSE, MF_ENABLED);
+    SetMenuDefaultItem(m, SC_CLOSE, FALSE);
+    int cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, sx, sy, 0, hwnd, nullptr);
+    if (cmd) PostMessageW(hwnd, WM_SYSCOMMAND, cmd, 0);
+}
+
 namespace app {
 
 void ApplyTheme() {
@@ -403,6 +431,7 @@ void ApplyTheme() {
     t = MakeTheme(def, accent);
     if (hwnd) {
         ApplyWindowTheme(hwnd, t);
+        UpdateFrameStyle();
         if (rt && s_rtOpaque != !t.backdrop) DiscardDevice();
         ThemeMenus(t.dark);
         WatchHangar(g_cfg.theme == L"hangar");
@@ -772,6 +801,7 @@ static void SetFullscreen(bool on) {
         SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
     ApplyWindowTheme(hwnd, t);
+    UpdateFrameStyle();
     chromeAlpha = on ? 0.0f : 1.0f;
     Invalidate();
 }
@@ -2391,9 +2421,22 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wp), p.x / scale, p.y / scale, msg == WM_MOUSEHWHEEL);
             return 0;
         }
+        case WM_NCRBUTTONUP:
+            if (wp == HTCAPTION) { ShowSystemMenu(GET_X_LPARAM(lp), GET_Y_LPARAM(lp)); return 0; }
+            break;
+        case WM_SYSCHAR:
+            if (wp == L' ') return 0;   // no beep: Alt+Space is handled on key down
+            break;
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
             if (msg == WM_SYSKEYDOWN && wp == VK_RETURN) { DoCmd(Cmd::Fullscreen); return 0; }
+            if (msg == WM_SYSKEYDOWN && wp == VK_F4) { PostMessageW(h, WM_CLOSE, 0, 0); return 0; }
+            if (msg == WM_SYSKEYDOWN && wp == VK_SPACE) {
+                RECT wr;
+                GetWindowRect(h, &wr);
+                ShowSystemMenu(wr.left + 8, wr.top + (int)(kTopBar * scale));
+                return 0;
+            }
             if (msg == WM_SYSKEYDOWN && wp != VK_F10) break;
             OnKey(wp, (lp & (1 << 30)) != 0);
             return 0;
@@ -2558,6 +2601,8 @@ HWND UiCreate(HINSTANCE inst, int show, const std::wstring& initialPath, const u
     HWND h = CreateWindowExW(WS_EX_APPWINDOW, LOUPE_WINDOW_CLASS, L"Loupe", WS_OVERLAPPEDWINDOW, x, y, w, hgt, nullptr, nullptr, inst, nullptr);
     if (!h) return nullptr;
     SetWindowPos(h, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    SendMessageW(h, WM_SETICON, ICON_BIG, (LPARAM)wc.hIcon);
+    SendMessageW(h, WM_SETICON, ICON_SMALL, (LPARAM)wc.hIconSm);
     ComputePreviewSize(MonitorFromWindow(h, MONITOR_DEFAULTTOPRIMARY));
     loader::Init(h);
     EnsureDevice();
