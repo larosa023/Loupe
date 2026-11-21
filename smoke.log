@@ -1,0 +1,72 @@
+Loupe 0.1.0 smoke test
+[first image]
+  first image: exif-landscape.jpg · 52 ms from process start to pixels ready (decode 12 ms)
+[folder listing]
+  15 images in the folder
+  memory: 29.0 MB private, 64.8 MB working set
+[open every image]
+[open anim.gif]
+  anim.gif: GIF 240x160, 12 frame(s), 1 ms
+[open anim.webp]
+  anim.webp: WebP (animated) 240x160, 12 frame(s), 2 ms
+[open anim-apng.png]
+  anim-apng.png: PNG (animated) 240x160, 12 frame(s), 1 ms
+[open broken.png]
+  broken.png: error: This image is damaged or in a format Loupe can't read.
+[open exif-landscape.jpg]
+  exif-landscape.jpg: JPEG 1600x1067, 1 frame(s), 6 ms
+[open icon.ico]
+  icon.ico: Icon 256x256, 1 frame(s), 1 ms
+[open large-6000.jpg]
+  large-6000.jpg: JPEG 6000x4000, 1 frame(s), 23 ms
+[open photo.bmp]
+  photo.bmp: BMP 1024x683, 1 frame(s), 3 ms
+[open photo.tiff]
+  photo.tiff: TIFF 1024x683, 1 frame(s), 5 ms
+[open raw-preview.dng]
+  raw-preview.dng: Digital Negative (DNG) · preview 1620x1080, 1 frame(s), 7 ms
+[open raw-preview.nef]
+  raw-preview.nef: Nikon RAW (NEF) · preview 1620x1080, 1 frame(s), 7 ms
+[open rot6-portrait.jpg]
+  rot6-portrait.jpg: JPEG 800x1200, 1 frame(s), 6 ms
+[open still.webp]
+  still.webp: WebP 1280x853, 1 frame(s), 6 ms
+[open transparent.png]
+  transparent.png: PNG 800x600, 1 frame(s), 1 ms
+[open vector.svg]
+  vector.svg: SVG 640x480, 1 frame(s), 34 ms
+[navigation and preloading]
+  next image was already decoded (no blank frame)
+[zoom to 100%]
+[zoom settles]
+  zoom is 100.0%
+[fit]
+[filmstrip]
+  14 thumbnails decoded
+[info panel]
+  info: camera 'Canon Canon EOS R6', ISO 400, 1/250 s, f/2.8, GPS 40.4100,-74.1700, taken Sunday, November 15, 2026, 4:12 PM
+[grid]
+[compare]
+[animation]
+  playing: frame 7 of 12
+[edit]
+[save a copy]
+  saved copy: 927x1390 from 1600x1067
+[save over the original]
+[saved over]
+  the original was replaced (now 683x1024)
+[undo the save]
+  Ctrl+Z put the original back
+[settings]
+  frame: backdrop, DWM caption buttons suppressed
+[themes]
+[slideshow]
+[copy image]
+[clipboard]
+  the image is on the clipboard
+[rename]
+[delete]
+  moved anim.gif to the Recycle Bin
+[undo delete]
+  restored from the Recycle Bin
+SMOKE OK

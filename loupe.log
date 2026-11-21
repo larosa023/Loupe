@@ -1,0 +1,15 @@
+2026-11-21 03:51:11.608 [6076] ==== Loupe 0.1.0 starting (data: C:\Users\runneradmin\AppData\Local\Loupe)
+2026-11-21 03:51:11.663 [6076] first image ready: 73 ms after start (decode 16 ms, JPEG 1600x1067)
+2026-11-21 03:51:15.638 [6076] Loupe exiting
+2026-11-21 03:51:15.670 [2368] ==== Loupe 0.1.0 starting (data: C:\Users\runneradmin\AppData\Local\Loupe)
+2026-11-21 03:51:15.707 [2368] first image ready: 50 ms after start (decode 14 ms, JPEG 1600x1067)
+2026-11-21 03:51:19.684 [2368] Loupe exiting
+2026-11-21 03:51:19.712 [3356] ==== Loupe 0.1.0 starting (data: C:\Users\runneradmin\AppData\Local\Loupe)
+2026-11-21 03:51:19.751 [3356] first image ready: 52 ms after start (decode 13 ms, JPEG 1600x1067)
+2026-11-21 03:51:23.731 [3356] Loupe exiting
+2026-11-21 03:51:24.082 [4280] ==== Loupe 0.1.0 starting (data: C:\Users\runneradmin\AppData\Local\Loupe)
+2026-11-21 03:51:24.122 [4280] first image ready: 52 ms after start (decode 12 ms, JPEG 1600x1067)
+2026-11-21 03:51:47.546 [4280] Loupe exiting
+2026-11-21 03:51:47.904 [7244] ==== Loupe 0.1.0 starting (data: C:\Users\runneradmin\AppData\Local\Loupe)
+2026-11-21 03:51:47.943 [7244] first image ready: 53 ms after start (decode 6 ms, BMP 1024x683)
+2026-11-21 03:51:52.005 [7244] Loupe exiting
