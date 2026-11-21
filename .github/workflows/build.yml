@@ -1,0 +1,257 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Zig and Pillow
+        run: pip install ziglang pillow
+
+      - name: Version
+        id: ver
+        run: |
+          VER=$(grep -oP 'LOUPE_VERSION L"\K[^"]+' src/common.h)
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Building Loupe $VER"
+
+      - name: Build Loupe.exe
+        run: ./build.sh
+
+      # an old build that the updater test upgrades to the latest release
+      - name: Build an old copy for the updater test
+        run: OUT=dist/Loupe-old.exe EXTRA_FLAGS='-DLOUPE_VERSION=L"0.0.1"' ./build.sh
+
+      - name: Test images
+        run: python3 tools/make_test_images.py testimages
+
+      - name: Package
+        run: |
+          cp README.md dist/
+          cd dist
+          zip Loupe-win-x64.zip Loupe.exe README.md
+          sha256sum Loupe.exe Loupe-win-x64.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Loupe-win-x64
+          path: |
+            dist/Loupe.exe
+            dist/Loupe-old.exe
+            dist/Loupe-win-x64.zip
+            dist/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: testimages
+          path: testimages/
+
+  test:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Loupe-win-x64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: testimages
+          path: testimages
+
+      - name: Cold start (time to first pixels)
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = (Resolve-Path dist/Loupe.exe).Path
+          $img = (Resolve-Path testimages/exif-landscape.jpg).Path
+          $log = Join-Path $env:LOCALAPPDATA 'Loupe\loupe.log'
+          foreach ($run in 1..3) {
+            $p = Start-Process $exe -ArgumentList "`"$img`"" -PassThru
+            Start-Sleep -Seconds 4
+            & $exe --quit
+            if (-not $p.WaitForExit(15000)) { $p.Kill(); throw 'Loupe did not close on --quit' }
+          }
+          Get-Content $log | Select-String 'first image ready'
+          Get-Process Loupe -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - name: Smoke test (every format and feature)
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $work = Join-Path $env:RUNNER_TEMP 'smoke'
+          New-Item -ItemType Directory $work -Force | Out-Null
+          Copy-Item testimages "$work\images" -Recurse
+          $log = Join-Path $work 'smoke.log'
+          $p = Start-Process dist/Loupe.exe -ArgumentList '--smoke', "`"$log`"", "`"$work\images`"" -PassThru
+          if (-not $p.WaitForExit(600000)) { $p.Kill(); Write-Host 'Timed out' }
+          if (Test-Path $log) { Get-Content $log }
+          Write-Host '--- loupe.log ---'
+          Get-Content (Join-Path $env:LOCALAPPDATA 'Loupe\loupe.log') -ErrorAction SilentlyContinue | Select-Object -Last 40
+          if ($p.ExitCode -ne 0 -or -not (Select-String -Path $log -Pattern 'SMOKE OK' -Quiet)) { throw "Smoke test failed (exit $($p.ExitCode))" }
+
+      - name: Same window, hand-over and --quit
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = (Resolve-Path dist/Loupe.exe).Path
+          $a = (Resolve-Path testimages/photo.bmp).Path
+          $b = (Resolve-Path testimages/still.webp).Path
+          $first = Start-Process $exe -ArgumentList "`"$a`"" -PassThru
+          Start-Sleep -Seconds 4
+          $second = Start-Process $exe -ArgumentList "`"$b`"" -PassThru
+          if (-not $second.WaitForExit(15000)) { $second.Kill(); throw 'A second launch did not hand its image to the open window' }
+          if ($first.HasExited) { throw 'The open Loupe exited unexpectedly' }
+          Write-Host "second launch handed over and exited ($($second.ExitCode))"
+          $quit = Start-Process $exe -ArgumentList '--quit' -PassThru -Wait
+          if (-not $first.WaitForExit(20000)) { $first.Kill(); throw 'Loupe did not close on --quit' }
+          Write-Host 'Single window OK'
+
+      - name: File types (register, check, uninstall)
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path dist/Loupe.exe).Path
+          Start-Process $exe -ArgumentList '--register' -Wait
+          $cmd = (Get-ItemProperty 'HKCU:\Software\Classes\Loupe.Image\shell\open\command').'(default)'
+          Write-Host "open command: $cmd"
+          if ($cmd -notlike "*Loupe.exe*") { throw 'File types were not registered' }
+          $caps = Get-ItemProperty 'HKCU:\Software\larosa023\Loupe\Capabilities\FileAssociations'
+          if ($caps.'.jpg' -ne 'Loupe.Image' -or $caps.'.cr3' -ne 'Loupe.Image') { throw 'Capabilities missing' }
+          Start-Process $exe -ArgumentList '--uninstall' -Wait
+          if (Test-Path 'HKCU:\Software\Classes\Loupe.Image') { throw '--uninstall left the ProgID behind' }
+          Write-Host 'File types OK'
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/smoke/shots/*.png
+          if-no-files-found: ignore
+
+      # Artifacts live on blob storage; a branch is easier to look at from anywhere git works.
+      - name: Publish screenshots to the ci-screenshots branch
+        if: always() && github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $shots = Join-Path $env:RUNNER_TEMP 'smoke\shots'
+          if (-not (Test-Path $shots)) { exit 0 }
+          $d = Join-Path $env:RUNNER_TEMP 'shotrepo'
+          New-Item -ItemType Directory $d | Out-Null
+          Copy-Item "$shots\*.png" $d
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'smoke\smoke.log') $d -ErrorAction SilentlyContinue
+          Copy-Item (Join-Path $env:LOCALAPPDATA 'Loupe\loupe.log') $d -ErrorAction SilentlyContinue
+          Set-Location $d
+          git init -q -b ci-screenshots
+          git config user.name "github-actions"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Screenshots for $env:GITHUB_SHA ($env:GITHUB_REF_NAME)"
+          git push -q -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" ci-screenshots
+
+  # A release is published when LOUPE_VERSION in src/common.h changes on main (or a v* tag is pushed).
+  # Versions with a "-", such as 0.2.0-beta.1, are pre-releases: the Beta channel.
+  release:
+    needs: [build, test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.rel.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Loupe-win-x64
+          path: dist
+
+      - name: Decide
+        id: rel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ needs.build.outputs.version }}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then TAG="${GITHUB_REF#refs/tags/}"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" == *-* ]]; then echo "pre=true" >> "$GITHUB_OUTPUT"; else echo "pre=false" >> "$GITHUB_OUTPUT"; fi
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"; echo "Release $TAG already exists"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"; echo "Will publish $TAG"
+          fi
+
+      - name: Release
+        if: steps.rel.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Loupe ${{ steps.rel.outputs.tag }}
+          prerelease: ${{ steps.rel.outputs.pre }}
+          make_latest: ${{ steps.rel.outputs.pre == 'false' }}
+          body_path: CHANGELOG-latest.md
+          files: |
+            dist/Loupe.exe
+            dist/Loupe-win-x64.zip
+            dist/SHA256SUMS.txt
+
+  # An old build finds the release, downloads and verifies it, swaps itself and checks the new one starts.
+  update-test:
+    needs: [build, release]
+    if: needs.release.result == 'success'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Loupe-win-x64
+          path: dist
+
+      - name: Old version updates itself to the latest release
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'updtest'
+          New-Item -ItemType Directory $dir -Force | Out-Null
+          Copy-Item dist/Loupe-old.exe "$dir\Loupe.exe"
+          $exe = "$dir\Loupe.exe"
+          & $exe --write-version "$dir\before.txt" | Out-Null
+          Start-Sleep -Seconds 1
+          Write-Host "before: $(Get-Content $dir\before.txt)"
+          $log = "$dir\update.log"
+          $env:LOUPE_GITHUB_TOKEN = '${{ github.token }}'
+          $p = Start-Process $exe -ArgumentList '--update-test', "`"$log`"" -PassThru
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); Write-Host 'Timed out' }
+          Get-Content $log
+          Start-Sleep -Seconds 5
+          & $exe --write-version "$dir\after.txt" | Out-Null
+          Start-Sleep -Seconds 1
+          $after = Get-Content "$dir\after.txt"
+          Write-Host "after: $after"
+          if ($p.ExitCode -ne 0) { throw "The update test failed (exit $($p.ExitCode))" }
+          if ($after -eq '0.0.1') { throw 'The updater did not replace the exe' }
+          if ($after -ne '${{ needs.build.outputs.version }}' -and '${{ needs.build.outputs.version }}' -notlike '*-*') { throw "Expected ${{ needs.build.outputs.version }}, got $after" }
+          $kept = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Loupe\versions') -ErrorAction SilentlyContinue
+          Write-Host "kept for rollback: $($kept.Name -join ', ')"

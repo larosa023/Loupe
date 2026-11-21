@@ -1,0 +1,28 @@
+#include <windows.h>
+1 ICON "loupe.ico"
+1 RT_MANIFEST "loupe.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 0,1,0,0
+ PRODUCTVERSION 0,1,0,0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "larosa023"
+      VALUE "FileDescription", "Loupe"
+      VALUE "FileVersion", "0.1.0"
+      VALUE "ProductName", "Loupe"
+      VALUE "ProductVersion", "0.1.0"
+      VALUE "LegalCopyright", "larosa023"
+      VALUE "OriginalFilename", "Loupe.exe"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
